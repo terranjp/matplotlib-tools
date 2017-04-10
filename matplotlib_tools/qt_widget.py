@@ -11,6 +11,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
+from matplotlib_tools.mpl_tools import Ruler
+from matplotlib_tools.mpl_tools import TextMover
 
 toolTipStyle = """
     QLabel{
@@ -27,6 +29,8 @@ class PlotWindow(QWidget):
     def __init__(self, parent=None):
         super(PlotWindow, self).__init__(parent)
 
+        # self.setupUI()
+
         changeButton = QPushButton("Change")
         changeButton.pressed.connect(self.changePlot)
         changeSizeBtn = QPushButton("changeSize")
@@ -40,8 +44,9 @@ class PlotWindow(QWidget):
         toolLayout.setContentsMargins(0, 0, 0, 0)
         toolWidget.setLayout(toolLayout)
 
-        self.ax = None
         self.fig = Figure()
+        self.ax = self.fig.add_subplot(111)
+
         self.canvas = FigureCanvas(self.fig)
         self.MPL_toolbar = MPLtoolbar(self.canvas, self, coordinates=True)
 
@@ -58,7 +63,7 @@ class PlotWindow(QWidget):
         self.tooltipWidget.setWindowFlags(Qt.CustomizeWindowHint | Qt.FramelessWindowHint)
         self.tooltipWidget.setStyleSheet(toolTipStyle)
 
-        self.ruler = Ruler(fig=self.fig)
+        self.ruler = Ruler(ax=self.ax, fig=self.fig)
         self.rulerCheckbox = QCheckBox()
         self.rulerCheckbox.setText("Ruler On:")
         toolLayout.addWidget(self.rulerCheckbox)
@@ -70,6 +75,13 @@ class PlotWindow(QWidget):
             self.ruler.rulerActivated = True
         else:
             self.ruler.rulerActivated = False
+
+    def plotAxes(self, x, y):
+        self.fig.clf()
+        self.ax = self.fig.add_subplot(111)
+        self.ax.plot(x, y)
+
+        self.canvas.draw()
 
     def plotCoords(self, coords):
 
@@ -87,31 +99,31 @@ class PlotWindow(QWidget):
         self.fig.canvas.mpl_connect('motion_notify_event', self.onPlotHover)
         self.canvas.draw()
 
-    def findNearest(self, array, value):
-        idx = (np.abs(array - value)).argmin()
-        return idx
+    # def findNearest(self, array, value):
+    #     idx = (np.abs(array - value)).argmin()
+    #     return idx
+    #
+    # @staticmethod
+    # def findNearestFast(array, value):
+    #     idx = np.searchsorted(array, value, side="left")
+    #     if idx > 0 and (idx == len(array) or math.fabs(value - array[idx - 1]) < math.fabs(value - array[idx])):
+    #         return array[idx - 1]
+    #     else:
+    #         return array[idx]
 
-    @staticmethod
-    def findNearestFast(array, value):
-        idx = np.searchsorted(array, value, side="left")
-        if idx > 0 and (idx == len(array) or math.fabs(value - array[idx - 1]) < math.fabs(value - array[idx])):
-            return array[idx - 1]
-        else:
-            return array[idx]
-
-    def onPlotHover(self, event):
-        for curve in self.ax.get_lines():
-            if curve.contains(event)[0]:
-                print(event)
-                xCoord = event.xdata
-                index = int(self.findNearestFast(self.output.lineCoords.x, xCoord))
-                # print('Index: ', index)
-                tensionString = 'xTension: {:0.2f} kips; yTension: {:0.2f} kips'.format(self.output.lineTension.x[index], self.output.lineTension.y[index])
-                self.tooltipWidget.setText(tensionString)
-                tooltipPos = QPoint(QCursor.pos().x() + 10, QCursor.pos().y() - 10)
-
-                self.tooltipWidget.move(tooltipPos)
-                self.tooltipWidget.show()
+    # def onPlotHover(self, event):
+    #     for curve in self.ax.get_lines():
+    #         if curve.contains(event)[0]:
+    #             print(event)
+    #             xCoord = event.xdata
+    #             index = int(self.findNearestFast(self.output.lineCoords.x, xCoord))
+    #             # print('Index: ', index)
+    #             tensionString = 'xTension: {:0.2f} kips; yTension: {:0.2f} kips'.format(self.output.lineTension.x[index], self.output.lineTension.y[index])
+    #             self.tooltipWidget.setText(tensionString)
+    #             tooltipPos = QPoint(QCursor.pos().x() + 10, QCursor.pos().y() - 10)
+    #
+    #             self.tooltipWidget.move(tooltipPos)
+    #             self.tooltipWidget.show()
             # else:
                 # self.tooltipWidget.hide()
                 # print('hide')
