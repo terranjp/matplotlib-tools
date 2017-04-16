@@ -41,8 +41,7 @@ To use the ruler pass an Axes instance as the first arg to the constructor. A ex
     plt.show()
 
 
-![Ruler Gif]
-(/animated_gif/mpl_ruler.gif)
+![Ruler Gif](/animated_gif/mpl_ruler.gif?raw=True)
 
 
 
