@@ -1,22 +1,42 @@
 import numpy as np
 
-from matplotlib.patches import FancyArrowPatch
 from matplotlib.text import Text
 from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 
 
 class Ruler(object):
     """
-    Simple measurement tool for matplotlib. 
+    A simple ruler to measure distances on an axes instance. 
+    
+    There are two modes of operation:
+    
+    1. Hold left click drag and release to draw the ruler in the axes.
+      - Hold shift while dragging to lock the ruler to the horizontal axis.
+      - Hold control while drawing to lock the ruler to the vertical axis. 
+    
+    2. Right click to set the start point and right click again to set the endpoint. 
+    
+    The keyboard can be used to activate and deactivate the ruler and toggle visibility of the line and text:
+    
+    'm' : Toggles the ruler on and off. Currently there is no indication on the figure that 
+        the ruler is activated. 
+         
+    'ctl+m' : Toggles the visibility of the ruler and text. 
+    
     
     """
-    def __init__(self, ax: Axes, ruler_unit: str=None):
+    def __init__(self, ax: Axes, ruler_active=True, ruler_unit: str=None):
+        """
+        Add a ruler to *ax*. If ``ruler_active=True``, the ruler will be activated when the plot is first created.
+        If ``ruler_unit`` is set the string will be appended to the length text annotations. 
+        
+        """
+
         self.ax = ax
         self.fig = ax.figure
+        self.ruler_active = ruler_active
         self.ruler_unit = ruler_unit
 
-        self.ruler_activated = True
         self.ruler_visible = True
         self.mouse_1_pressed = False
         self.mouse_3_pressed = False
@@ -28,36 +48,24 @@ class Ruler(object):
         self.x1 = None
         self.y1 = None
 
-        self.arrow_init_coords = None
+        self.line_start_coords = None
+        self.line_end_coords = None
 
-        self.arrow = None
+        self.line, = self.ax.plot([0, 0], [0, 0])
+        self.line_text = self.ax.text(0, 0, '')
+        self.detail_text = self.ax.figure.text(0, 0.01, '')
         self.ruler_marker = None
-        self.fig_measure_text = None
-        self.ruler_text = None
-        self.create_arrow()
+
         self.background = None
 
-        self.connect()
+        self.connect_events()
 
-    def connect(self):
+    def connect_events(self):
         self.fig.canvas.mpl_connect('button_press_event', self.on_press)
         self.fig.canvas.mpl_connect('button_release_event', self.on_release)
         self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
         self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
         self.fig.canvas.mpl_connect('key_release_event', self.on_key_release)
-
-    def create_arrow(self):
-        # Create an arrow from a Fancy Arrow Patch
-        # TODO: Allow configuration of arrow with kwargs
-        self.arrow = FancyArrowPatch(posA=(0, 0), posB=(0, 0))
-        self.arrow.set_mutation_scale(5)
-        self.arrow.set_color('r')
-        self.ax.add_patch(self.arrow)
-
-        # Add empty text artists to the figure and the axes.
-        # TODO: Allow config of text with kwargs
-        self.fig_measure_text = Figure.text(self=self.ax.figure, x=0, y=0.01, s='')
-        self.ruler_text = self.ax.text(0, 0, '')
 
     def on_key_press(self, event):
         if event.key == 'shift':
@@ -80,38 +88,41 @@ class Ruler(object):
             self.control_pressed = False
 
     def toggle_ruler(self):
-        if self.ruler_activated is True:
+        if self.ruler_active is True:
             print('Ruler: deactivated')
-            self.ruler_activated = False
+            self.ruler_active = False
 
-        elif self.ruler_activated is False:
+        elif self.ruler_active is False:
             print('Ruler: activated')
-            self.ruler_activated = True
+            self.ruler_active = True
 
     def toggle_ruler_visibility(self):
         if self.ruler_visible is True:
             print('Ruler: invisible')
-            self.ruler_activated = False
+            self.ruler_active = False
             self.ruler_visible = False
-            self.arrow.set_visible(False)
-            self.ruler_text.set_visible(False)
-            self.fig_measure_text.set_visible(False)
+            self.line.set_visible(False)
+            self.line_text.set_visible(False)
+            self.detail_text.set_visible(False)
 
         elif self.ruler_visible is False:
             print('Ruler: visible')
             self.ruler_visible = True
-            self.arrow.set_visible(True)
-            self.ruler_text.set_visible(True)
-            self.fig_measure_text.set_visible(True)
+            self.line.set_visible(True)
+            self.line_text.set_visible(True)
+            self.detail_text.set_visible(True)
 
         self.fig.canvas.draw()
 
     def on_press(self, event):
-        print(event.button)
+        """
+        On mouse button press check if mouse is within the axes and 
+        then check which button has been pressed and handle event
+        """
 
         if event.inaxes != self.ax.axes:
             return
-        if self.ruler_activated is False:
+        if self.ruler_active is False:
             return
 
         if event.button == 1 and self.mouse_3_pressed is False:
@@ -120,57 +131,66 @@ class Ruler(object):
             self.handle_button_3_press(event)
 
     def handle_button_1_press(self, event):
-        if self.arrow is None:
-            self.create_arrow()
+        """On button 1 press start drawing the ruler line from the initial press position"""
 
         self.mouse_1_pressed = True
 
         self.x0 = event.xdata
         self.y0 = event.ydata
 
-        self.arrow.set_animated(True)
-        self.fig_measure_text.set_animated(True)
-        self.ruler_text.set_animated(True)
+        self.line.set_animated(True)
+        self.line_text.set_animated(True)
+        self.detail_text.set_animated(True)
 
         self.fig.canvas.draw()
         self.background = self.fig.canvas.copy_from_bbox(self.fig.bbox)
 
         # Redraw everything
-        self.fig.draw_artist(self.arrow)
-        self.fig.draw_artist(self.fig_measure_text)
-        self.fig.draw_artist(self.ruler_text)
+        self.fig.draw_artist(self.line)
+        self.fig.draw_artist(self.line_text)
+        self.fig.draw_artist(self.detail_text)
 
-        # Blit the whole figure. Tried just drawing the arrow and the text but ran into clipping issues.
+        # Blit the whole figure.
         self.fig.canvas.blit(self.fig.bbox)
 
     def handle_button_3_press(self, event):
-        if self.arrow is None:
-            self.create_arrow()
+        """
+        If button 3 is pressed draw on indicator at first press and then draw the lin to the cursor on second press
+
+        """
 
         self.mouse_3_pressed = True
 
-        if self.arrow_init_coords is None:
+        if self.line_start_coords is None:
             self.x0 = event.xdata
             self.y0 = event.ydata
             self.ruler_marker, = self.ax.plot(self.x0, self.y0, 'xr')
             self.fig.canvas.draw()
-            self.arrow_init_coords = self.x0, self.y0
+            self.line_start_coords = self.x0, self.y0
 
-        elif self.arrow_init_coords is not None:
+        elif self.line_start_coords is not None:
             self.x1 = event.xdata
             self.y1 = event.ydata
-            self.arrow_end_coords = self.x1, self.y1
+            self.line_end_coords = self.x1, self.y1
 
-            self.arrow.set_positions(posA=self.arrow_init_coords, posB=self.arrow_end_coords)
-            self.ruler_text.set_position(self.arrow.get_path().vertices[1])
+            posA = self.line_start_coords[0], self.line_end_coords[0]
+            posB = self.line_start_coords[1], self.line_end_coords[1]
+
+            self.line.set_data(posA, posB)
+
+            mid_line_coords = (self.x0 + self.x1) / 2, (self.y0 + self.y1) / 2
+            self.line_text.set_position(mid_line_coords)
+
             self.ruler_marker.remove()
             self.update_text()
             self.fig.canvas.draw()
-            self.arrow_init_coords = None
+            self.line_start_coords = None
             self.mouse_3_pressed = False
 
     def on_motion(self, event):
-        # On press check if mouse is inside the plot axes.
+        """
+        On mouse motion draw the ruler and update the text if button 1 is pressed. 
+        """
         if event.inaxes != self.ax.axes:
             return
 
@@ -178,54 +198,62 @@ class Ruler(object):
             self.x1 = event.xdata
             self.y1 = event.ydata
 
-            # If shift is pressed arrow can only move in horizontal axis
+            # If shift is pressed ruler is constrained to horizontal axis
             if self.shift_pressed is True:
-                pos_a = (self.x0, self.y0)
-                pos_b = (self.x1, self.y0)
-            # If control is pressed arrow can only move in vertical axis
+                pos_a = self.x0, self.x1
+                pos_b = self.y0, self.y0
+            # If control is pressed ruler is constrained to vertical axis
             elif self.control_pressed is True:
-                pos_a = (self.x0, self.y0)
-                pos_b = (self.x0, self.y1)
+                pos_a = self.x0, self.x0
+                pos_b = self.y0, self.y1
+            # Else the ruler follow the mouse cursor
             else:
-                pos_a = (self.x0, self.y0)
-                pos_b = (self.x1, self.y1)
+                pos_a = self.x0, self.x1
+                pos_b = self.y0, self.y1
 
-            # Update position of the length annotation and the arrow
-            self.arrow.set_positions(posA=pos_a, posB=pos_b)
-            self.ruler_text.set_position(self.arrow.get_path().vertices[1])
+            # Update position of line, the text length annotation on the middle of the line
+            self.line.set_data([pos_a], [pos_b])
 
+            line_coords = self.line.get_path().vertices
+            x0 = line_coords[0][0]
+            y0 = line_coords[0][1]
+            x1 = line_coords[1][0]
+            y1 = line_coords[1][1]
+            mid_line_coords = (x0 + x1)/2, (y0 + y1)/2
+
+            self.line_text.set_position(mid_line_coords)
             self.update_text()
-
-            # Draw everything. Tried to draw the arrow and text separately but ran into clipping issues
             self.fig.canvas.restore_region(self.background)
 
-            # Redraw the arrow and text
-            self.fig.draw_artist(self.arrow)
-            self.fig.draw_artist(self.fig_measure_text)
-            self.fig.draw_artist(self.ruler_text)
+            # Redraw arrow and text
+            self.fig.draw_artist(self.line)
+            self.fig.draw_artist(self.line_text)
+            self.fig.draw_artist(self.detail_text)
 
             # Blit the whole figure
             self.fig.canvas.blit(self.fig.bbox)
 
     def update_text(self):
+        """Update the length text on the line and detailed text on the figure"""
+
         if self.ruler_unit is not None:
-            self.ruler_text.set_text("{:0.2f} {}".format(self.ruler_length, self.ruler_unit))
-            measure_string = "L: {:0.2f} {}; dx: {:0.2f} {}; dy: {:0.2f} {}; angle: {:0.2f} °".format(self.ruler_length,
-                                                                                                      self.ruler_unit,
-                                                                                                      self.ruler_dx,
-                                                                                                      self.ruler_unit,
-                                                                                                      self.ruler_dy,
-                                                                                                      self.ruler_unit,
-                                                                                                      self.ruler_angle)
+            self.line_text.set_text("{:0.3f} {}".format(self.ruler_length, self.ruler_unit))
+            detail_string = "L: {:0.3f} {}; dx: {:0.3f} {}; dy: {:0.3f} {}; angle: {:0.3f} °".format(self.ruler_length,
+                                                                                                     self.ruler_unit,
+                                                                                                     self.ruler_dx,
+                                                                                                     self.ruler_unit,
+                                                                                                     self.ruler_dy,
+                                                                                                     self.ruler_unit,
+                                                                                                     self.ruler_angle)
 
         else:
-            self.ruler_text.set_text("{:0.2f}".format(self.ruler_length))
-            measure_string = "Length: {:0.2f}; dx: {:0.2f}; dy: {:0.2f}; angle: {:0.2f} °".format(self.ruler_length,
-                                                                                                  self.ruler_dx,
-                                                                                                  self.ruler_dy,
-                                                                                                  self.ruler_angle)
+            self.line_text.set_text("{:0.3f}".format(self.ruler_length))
+            detail_string = "Length: {:0.3f}; dx: {:0.3f}; dy: {:0.3f}; angle: {:0.3f} °".format(self.ruler_length,
+                                                                                                 self.ruler_dx,
+                                                                                                 self.ruler_dy,
+                                                                                                 self.ruler_angle)
 
-        self.fig_measure_text.set_text(measure_string)
+        self.detail_text.set_text(detail_string)
 
     def on_release(self, event):
         self.mouse_1_pressed = False
@@ -233,9 +261,9 @@ class Ruler(object):
         if event.inaxes != self.ax.axes:
             return
 
-        self.arrow.set_animated(False)
-        self.fig_measure_text.set_animated(False)
-        self.ruler_text.set_animated(False)
+        self.line.set_animated(False)
+        self.line_text.set_animated(False)
+        self.detail_text.set_animated(False)
         self.background = None
         self.ax.figure.canvas.draw()
 
@@ -259,21 +287,29 @@ class Ruler(object):
 
 
 class TextMover(object):
-    def __init__(self, ax):
+    """
+    A simple little tool to move text annotation in an axes by clicking and dragging them. 
+
+    """
+
+    def __init__(self, ax: Axes, active=False):
         self.ax = ax
+        self.active = active
         self.selectedText = None
         self.mousePressed = False
         self.background = None
-        self.connect()
+        self.connect_events()
 
-    def connect(self):
+    def connect_events(self):
         self.ax.figure.canvas.mpl_connect('button_press_event', self.on_button_press)
         self.ax.figure.canvas.mpl_connect("pick_event", self.on_pick_event)
         self.ax.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
         self.ax.figure.canvas.mpl_connect('button_release_event', self.on_release)
 
     def on_pick_event(self, event):
-        print(event.mouseevent)
+
+        if self.active is False:
+            return
 
         if event.mouseevent.button != 1:
             return
@@ -320,8 +356,3 @@ class TextMover(object):
         self.selectedText.figure.canvas.draw()
         self.selectedText = None
 
-    def on_button_press(self, event):
-        xCoord = event.xdata
-        yCoord = event.ydata
-
-        coords = (xCoord, yCoord)
