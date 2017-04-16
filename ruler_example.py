@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from matplotlib_tools.mpl_tools import Ruler
+from matplotlib_tools.tools import Ruler
 
 xCoord = np.arange(0, 4*np.pi, 0.01)
 yCoord = np.sin(xCoord)
