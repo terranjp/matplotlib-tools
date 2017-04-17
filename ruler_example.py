@@ -12,4 +12,6 @@ ax.plot(xCoord, yCoord)
 
 ruler = Ruler(ax=ax)
 
+
+
 plt.show()

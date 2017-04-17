@@ -1,7 +1,8 @@
+from __future__ import print_function
+
 import numpy as np
 
 from matplotlib.text import Text
-from matplotlib.axes import Axes
 
 
 class Ruler(object):
@@ -25,7 +26,7 @@ class Ruler(object):
     
     
     """
-    def __init__(self, ax: Axes, ruler_active=True, ruler_unit: str=None):
+    def __init__(self, ax, active=True, unit=None):
         """
         Add a ruler to *ax*. If ``ruler_active=True``, the ruler will be activated when the plot is first created.
         If ``ruler_unit`` is set the string will be appended to the length text annotations. 
@@ -34,8 +35,8 @@ class Ruler(object):
 
         self.ax = ax
         self.fig = ax.figure
-        self.ruler_active = ruler_active
-        self.ruler_unit = ruler_unit
+        self.active = active
+        self.unit = unit
 
         self.ruler_visible = True
         self.mouse_1_pressed = False
@@ -88,18 +89,18 @@ class Ruler(object):
             self.control_pressed = False
 
     def toggle_ruler(self):
-        if self.ruler_active is True:
+        if self.active is True:
             print('Ruler: deactivated')
-            self.ruler_active = False
+            self.active = False
 
-        elif self.ruler_active is False:
+        elif self.active is False:
             print('Ruler: activated')
-            self.ruler_active = True
+            self.active = True
 
     def toggle_ruler_visibility(self):
         if self.ruler_visible is True:
             print('Ruler: invisible')
-            self.ruler_active = False
+            self.active = False
             self.ruler_visible = False
             self.line.set_visible(False)
             self.line_text.set_visible(False)
@@ -122,7 +123,7 @@ class Ruler(object):
 
         if event.inaxes != self.ax.axes:
             return
-        if self.ruler_active is False:
+        if self.active is False:
             return
 
         if event.button == 1 and self.mouse_3_pressed is False:
@@ -236,19 +237,19 @@ class Ruler(object):
     def update_text(self):
         """Update the length text on the line and detailed text on the figure"""
 
-        if self.ruler_unit is not None:
-            self.line_text.set_text("{:0.3f} {}".format(self.ruler_length, self.ruler_unit))
-            detail_string = "L: {:0.3f} {}; dx: {:0.3f} {}; dy: {:0.3f} {}; angle: {:0.3f} °".format(self.ruler_length,
-                                                                                                     self.ruler_unit,
+        if self.unit is not None:
+            self.line_text.set_text("{:0.3f} {}".format(self.ruler_length, self.unit))
+            detail_string = "L: {:0.3f} {}; dx: {:0.3f} {}; dy: {:0.3f} {}; angle: {:0.3f} deg".format(self.ruler_length,
+                                                                                                     self.unit,
                                                                                                      self.ruler_dx,
-                                                                                                     self.ruler_unit,
+                                                                                                     self.unit,
                                                                                                      self.ruler_dy,
-                                                                                                     self.ruler_unit,
+                                                                                                     self.unit,
                                                                                                      self.ruler_angle)
 
         else:
             self.line_text.set_text("{:0.3f}".format(self.ruler_length))
-            detail_string = "Length: {:0.3f}; dx: {:0.3f}; dy: {:0.3f}; angle: {:0.3f} °".format(self.ruler_length,
+            detail_string = "Length: {:0.3f}; dx: {:0.3f}; dy: {:0.3f}; angle: {:0.3f} deg".format(self.ruler_length,
                                                                                                  self.ruler_dx,
                                                                                                  self.ruler_dy,
                                                                                                  self.ruler_angle)
@@ -292,7 +293,7 @@ class TextMover(object):
 
     """
 
-    def __init__(self, ax: Axes, active=False):
+    def __init__(self, ax, active=True):
         self.ax = ax
         self.active = active
         self.selectedText = None
@@ -301,7 +302,6 @@ class TextMover(object):
         self.connect_events()
 
     def connect_events(self):
-        self.ax.figure.canvas.mpl_connect('button_press_event', self.on_button_press)
         self.ax.figure.canvas.mpl_connect("pick_event", self.on_pick_event)
         self.ax.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
         self.ax.figure.canvas.mpl_connect('button_release_event', self.on_release)
