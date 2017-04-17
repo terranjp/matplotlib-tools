@@ -7,7 +7,7 @@ An an interactive ruler to measure distances.
     
 There are two modes of operation:
 
-1. Hold left click drag and release to draw the ruler in the axes.
+1. Left click, drag and release to draw the ruler in the axes.
   - Hold shift while dragging to lock the ruler to the horizontal axis.
   - Hold control while drawing to lock the ruler to the vertical axis. 
 
