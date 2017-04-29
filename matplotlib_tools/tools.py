@@ -2,7 +2,7 @@ from __future__ import print_function
 import numpy as np
 from matplotlib.widgets import AxesWidget
 from matplotlib.text import Text
-
+from matplotlib.offsetbox import AnchoredText
 
 class Ruler(AxesWidget):
     """
@@ -28,10 +28,12 @@ class Ruler(AxesWidget):
     def __init__(self, ax, active=True,
                  length_unit=None,
                  angle_unit='degree',
+                 print_text=False,
+                 show_fig_text=True,
                  useblit=False,
                  lineprops=None,
-                 line_textprops=None,
-                 detail_textprops=None):
+                 detail_textprops=None,
+                 markerprops=None):
         """
         Add a ruler to *ax*. If ``ruler_active=True``, the ruler will be 
         activated when the plot is first created. If ``ruler_unit`` is set the 
@@ -45,15 +47,14 @@ class Ruler(AxesWidget):
         self.ax = ax
         self.fig = ax.figure
         self.canvas = ax.figure.canvas
+        self.print_text = print_text
+        self.show_fig_text = show_fig_text
 
         if lineprops is None:
             lineprops = {}
 
         if detail_textprops is None:
             detail_textprops = {}
-
-        if line_textprops is None:
-            line_textprops = {}
 
         self.visible = True
         self.active = active
@@ -66,6 +67,8 @@ class Ruler(AxesWidget):
         self.shift_pressed = False
         self.control_pressed = False
 
+        self.end_a_lock = False
+
         self.x0 = None
         self.y0 = None
         self.x1 = None
@@ -74,10 +77,59 @@ class Ruler(AxesWidget):
         self.line_end_coords = None
         self.ruler_marker = None
         self.background = None
+        self.ruler_moving = False
+        self.end_a_lock = False
+        self.end_b_lock = False
+        self.end_c_lock = False
+        self.old_marker_a_coords = None
+        self.old_marker_c_coords = None
+        self.old_mid_coords = None
 
-        self.line_text = self.ax.text(0, 0, '', **line_textprops)
+        bbox = dict(facecolor='white',
+                    alpha=0.5,
+                    boxstyle='round',
+                    edgecolor='0.75')
+
+        self.axes_text = self.ax.annotate(s='',
+                                          xy=(0, 1),
+                                          xytext=(10, -10),
+                                          xycoords='axes fraction',
+                                          textcoords='offset points',
+                                          va='top',
+                                          bbox=bbox)
+
+        self.ax.add_artist(self.axes_text)
         self.detail_text = self.ax.figure.text(0, 0.01, '', **detail_textprops)
-        self.line, = self.ax.plot([0, 0], [0, 0], **lineprops)
+        self.ruler, = self.ax.plot([0, 0], [0, 0], label='ruler', **lineprops)
+
+        default_markerprops = dict(marker='s',
+                                   markersize=3,
+                                   markerfacecolor='white',
+                                   markeredgecolor='black',
+                                   markeredgewidth=0.5,
+                                   picker=5,
+                                   visible=False)
+
+        # If marker props are given as an argument combine with the default
+        # marker props
+        if markerprops is not None:
+            used_markerprops = default_markerprops.copy()
+            used_markerprops.update(markerprops)
+        else:
+            used_markerprops = default_markerprops
+
+        self.marker_a, = self.ax.plot((0, 0), **used_markerprops)
+        self.marker_b, = self.ax.plot((0, 0), **used_markerprops)
+        self.marker_c, = self.ax.plot((0, 0), **used_markerprops)
+
+        self.artists = [self.axes_text,
+                        self.ruler,
+                        self.marker_a,
+                        self.marker_b,
+                        self.marker_c]
+
+        # if self.show_fig_text is False:
+        #     self.artists.pop(0)
 
     def connect_events(self):
         self.connect_event('button_press_event', self.on_press)
@@ -125,21 +177,17 @@ class Ruler(AxesWidget):
 
     def toggle_ruler_visibility(self):
         if self.visible is True:
-
+            for artist in self.artists:
+                artist.set_visible(False)
             self.active = False
             self.visible = False
-            self.line.set_visible(False)
-            self.line_text.set_visible(False)
-            self.detail_text.set_visible(False)
 
         elif self.visible is False:
-
+            for artist in self.artists:
+                artist.set_visible(True)
             self.visible = True
-            self.line.set_visible(True)
-            self.line_text.set_visible(True)
-            self.detail_text.set_visible(True)
 
-        self.fig.canvas.draw()
+        self.fig.canvas.draw_idle()
 
     def on_press(self, event):
         """
@@ -163,12 +211,14 @@ class Ruler(AxesWidget):
         self.x0 = event.xdata
         self.y0 = event.ydata
 
-        if self.useblit:
-            self.line.set_animated(True)
-            self.line_text.set_animated(True)
-            self.detail_text.set_animated(True)
-            self.fig.canvas.draw()
+        self.marker_a.set_data((event.xdata, event.ydata))
+        self.marker_a.set_visible(True)
 
+        if self.useblit:
+            self.marker_a.set_data(self.x0, self.y0)
+            for artist in self.artists:
+                artist.set_animated(True)
+            self.fig.canvas.draw()
             self.background = self.fig.canvas.copy_from_bbox(self.fig.bbox)
 
     def handle_button3_press(self, event):
@@ -176,34 +226,26 @@ class Ruler(AxesWidget):
         If button 3 is pressed draw on indicator at first press and then draw 
         the lin to the cursor on second press
         """
+        contains_a, attrd = self.marker_a.contains(event)
+        contains_b, attrd = self.marker_b.contains(event)
+        contains_c, attrd = self.marker_c.contains(event)
 
-        self.mouse3_pressed = True
+        if contains_a and contains_b and contains_c is False:
+            return
 
-        if self.line_start_coords is None:
-            self.x0 = event.xdata
-            self.y0 = event.ydata
-            self.ruler_marker, = self.ax.plot(self.x0, self.y0, 'xr')
-            self.line_start_coords = self.x0, self.y0
-            self.fig.canvas.draw_idle()
+        self.end_a_lock = True if contains_a is True else False
+        self.end_b_lock = True if contains_b is True else False
+        self.end_c_lock = True if contains_c is True else False
 
-        elif self.line_start_coords is not None:
-            self.x1 = event.xdata
-            self.y1 = event.ydata
-            self.line_end_coords = self.x1, self.y1
+        line_coords = self.ruler.get_path().vertices
+        self.x0 = line_coords[0][0]
+        self.y0 = line_coords[0][1]
+        self.x1 = line_coords[1][0]
+        self.y1 = line_coords[1][1]
 
-            pos_a = self.line_start_coords[0], self.line_end_coords[0]
-            pos_b = self.line_start_coords[1], self.line_end_coords[1]
-
-            self.line.set_data(pos_a, pos_b)
-
-            mid_line_coords = (self.x0 + self.x1) / 2, (self.y0 + self.y1) / 2
-            self.line_text.set_position(mid_line_coords)
-            self.ruler_marker.remove()
-            self.update_text()
-            self.canvas.draw_idle()
-
-            self.line_start_coords = None
-            self.mouse3_pressed = False
+        self.old_marker_a_coords = self.marker_a.get_path().vertices
+        self.old_marker_c_coords = self.marker_c.get_path().vertices
+        self.old_mid_coords = self.midline_coords
 
     def on_move(self, event):
         """
@@ -212,35 +254,107 @@ class Ruler(AxesWidget):
         if event.inaxes != self.ax.axes:
             return
 
+        if self.end_a_lock or self.end_b_lock or self.end_c_lock is True:
+            self.move_ruler(event)
+
         if self.mouse1_pressed is True:
-            self.x1 = event.xdata
-            self.y1 = event.ydata
+            self.draw_ruler(event)
 
-            # If shift is pressed ruler is constrained to horizontal axis
-            if self.shift_pressed is True:
-                pos_a = self.x0, self.x1
-                pos_b = self.y0, self.y0
-            # If control is pressed ruler is constrained to vertical axis
-            elif self.control_pressed is True:
-                pos_a = self.x0, self.x0
-                pos_b = self.y0, self.y1
-            # Else the ruler follow the mouse cursor
-            else:
-                pos_a = self.x0, self.x1
-                pos_b = self.y0, self.y1
+    def move_ruler(self, event):
+        """
+        If one of the markers is locked move the ruler according the selected
+        marker. 
+        """
 
-            self.line.set_data([pos_a], [pos_b])
+        # This flag is used to prevent the ruler from clipping when a marker is
+        # first selected
+        if self.ruler_moving is False:
+            if self.useblit:
+                for artist in self.artists:
+                    artist.set_animated(True)
+                self.fig.canvas.draw()
+                self.background = self.fig.canvas.copy_from_bbox(self.fig.bbox)
+                self.ruler_moving = True
 
-            pos0, pos1 = self.get_line_coords()
-            mid_line_coords = (pos0[0] + pos1[0]) / 2, (pos0[1] + pos1[1]) / 2
+        if self.end_a_lock is True:
+            # If marker a is locked only move end a.
+            pos_a = event.xdata, self.x1
+            pos_b = event.ydata, self.y1
+            self.marker_a.set_data(event.xdata, event.ydata)
+            self.ruler.set_data(pos_a, pos_b)
+            self.set_midline_marker()
 
-            self.line_text.set_position(mid_line_coords)
-            self.update_text()
-            self._update()
+        if self.end_c_lock is True:
+            # If marker a is locked only move end c.
+            pos_a = self.x0, event.xdata
+            pos_b = self.y0, event.ydata
+            self.marker_c.set_data(event.xdata, event.ydata)
+            self.ruler.set_data(pos_a, pos_b)
+            self.set_midline_marker()
 
-    def get_line_coords(self):
+        if self.end_b_lock is True:
+            # If marker b is locked shift the whole ruler.
+            b_dx = event.xdata - self.old_mid_coords[0]
+            b_dy = event.ydata - self.old_mid_coords[1]
+            pos_a = self.x0 + b_dx, self.x1 + b_dx
+            pos_b = self.y0 + b_dy, self.y1 + b_dy
 
-        line_coords = self.line.get_path().vertices
+            marker_a_coords = self.old_marker_a_coords[0][0] + b_dx, \
+                              self.old_marker_a_coords[0][1] + b_dy
+            marker_c_coords = self.old_marker_c_coords[0][0] + b_dx, \
+                              self.old_marker_c_coords[0][1] + b_dy
+
+            self.ruler.set_data(pos_a, pos_b)
+            self.marker_a.set_data(marker_a_coords)
+            self.marker_b.set_data(event.xdata, event.ydata)
+            self.marker_c.set_data(marker_c_coords)
+
+        self.update_text()
+        self._update_artists()
+
+    def set_midline_marker(self):
+        self.marker_b.set_visible(True)
+        self.marker_b.set_data(self.midline_coords)
+
+    @property
+    def midline_coords(self):
+        pos0, pos1 = self.line_coords
+        mid_line_coords = (pos0[0] + pos1[0]) / 2, (pos0[1] + pos1[1]) / 2
+
+        return mid_line_coords
+
+    def draw_ruler(self, event):
+        self.x1 = event.xdata
+        self.y1 = event.ydata
+
+        # If shift is pressed ruler is constrained to horizontal axis
+        if self.shift_pressed is True:
+            pos_a = self.x0, self.x1
+            pos_b = self.y0, self.y0
+        # If control is pressed ruler is constrained to vertical axis
+        elif self.control_pressed is True:
+            pos_a = self.x0, self.x0
+            pos_b = self.y0, self.y1
+        # Else the ruler follow the mouse cursor
+        else:
+            pos_a = self.x0, self.x1
+            pos_b = self.y0, self.y1
+
+        self.ruler.set_data([pos_a], [pos_b])
+        x1 = self.ruler.get_path().vertices[1][0]
+        y1 = self.ruler.get_path().vertices[1][1]
+
+        self.marker_c.set_visible(True)
+        self.marker_c.set_data(x1, y1)
+
+        self.set_midline_marker()
+        self.update_text()
+        self._update_artists()
+
+    @property
+    def line_coords(self):
+
+        line_coords = self.ruler.get_path().vertices
         x0 = line_coords[0][0]
         y0 = line_coords[0][1]
         x1 = line_coords[1][0]
@@ -251,13 +365,14 @@ class Ruler(AxesWidget):
 
         return pos_a, pos_b
 
-    def _update(self):
+    def _update_artists(self):
         if self.useblit:
             if self.background is not None:
                 self.canvas.restore_region(self.background)
-            self.fig.draw_artist(self.line)
-            self.fig.draw_artist(self.line_text)
-            self.fig.draw_artist(self.detail_text)
+
+            for artist in self.artists:
+                self.fig.draw_artist(artist)
+
             self.fig.canvas.blit(self.fig.bbox)
         else:
             self.canvas.draw_idle()
@@ -266,8 +381,6 @@ class Ruler(AxesWidget):
         """Update the text on the line and detailed text on the figure"""
 
         if self.length_unit is not None:
-            line_string = '{:0.3f} {}'.format(self.ruler_length,
-                                              self.length_unit)
 
             detail_string = 'L: {:0.3f} {}; dx: {:0.3f} {}; dy: {:0.3f} {}; ' \
                             'angle: {:0.3f} deg'.format(self.ruler_length,
@@ -278,50 +391,55 @@ class Ruler(AxesWidget):
                                                         self.length_unit,
                                                         self.ruler_angle)
         else:
-            line_string = '{:0.3f}'.format(self.ruler_length)
-            detail_string = 'Length: {:0.3f}; dx: {:0.3f}; dy: {:0.3f}; ' \
-                            'angle: {:0.3f} deg'.format(self.ruler_length,
+            detail_string = 'L: {:0.3f}; dx: {:0.3f}; dy: {:0.3f}; ' \
+                            'ang: {:0.3f} deg'.format(self.ruler_length,
                                                         self.ruler_dx,
                                                         self.ruler_dy,
                                                         self.ruler_angle)
-        self.line_text.set_text(line_string)
-        self.detail_text.set_text(detail_string)
+
+        # self.detail_text.set_text(detail_string)
+        self.axes_text.set_text(detail_string)
+        if self.print_text is True:
+            print(self.detail_text)
 
     def on_release(self, event):
         self.mouse1_pressed = False
+        self.mouse3_pressed = False
+        self.ruler_moving = False
+        self.end_a_lock = False
+        self.end_b_lock = False
+        self.end_c_lock = False
 
         if event.inaxes != self.ax.axes:
             return
 
         if self.useblit:
-            self.line.set_animated(False)
-            self.line_text.set_animated(False)
-            self.detail_text.set_animated(False)
+            for artist in self.artists:
+                artist.set_animated(False)
 
         self.canvas.draw_idle()
 
     @property
     def ruler_length(self):
-        pos0, pos1 = self.get_line_coords()
+        pos0, pos1 = self.line_coords
 
         return np.sqrt((pos1[0] - pos0[0]) ** 2 + (pos0[1] - pos1[1]) ** 2)
 
     @property
     def ruler_dx(self):
-        pos0, pos1 = self.get_line_coords()
+        pos0, pos1 = self.line_coords
 
         return np.abs(pos1[0] - pos0[0])
 
     @property
     def ruler_dy(self):
-        pos0, pos1 = self.get_line_coords()
+        pos0, pos1 = self.line_coords
 
         return np.abs(pos1[1] - pos0[1])
 
     @property
     def ruler_angle(self):
-
-        pos0, pos1 = self.get_line_coords()
+        pos0, pos1 = self.line_coords
 
         dx = pos1[0] - pos0[0]
         dy = pos1[1] - pos0[1]
@@ -332,7 +450,6 @@ class Ruler(AxesWidget):
             return angle * 180 / np.pi
         else:
             return angle
-
 
 
 class TextMover(object):
