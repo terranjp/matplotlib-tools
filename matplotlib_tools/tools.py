@@ -21,6 +21,7 @@ class Ruler(AxesWidget):
 
     'm' : Toggles the ruler on and off. 
 
+
     'ctl+m' : Toggles the visibility of the ruler and text. 
 
     """

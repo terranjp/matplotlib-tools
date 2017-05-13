@@ -21,7 +21,7 @@ ax = fig.add_subplot(111)
 
 ax.grid(True)
 ax.plot(xCoord, yCoord)
-ruler = Ruler(ax=ax, useblit=False, show_fig_text=False)
+ruler = Ruler(ax=ax, useblit=True, show_fig_text=True)
 ruler.set_active(True)
 
 
