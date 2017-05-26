@@ -7,7 +7,7 @@ An an interactive ruler to measure distances. Heavily inspired by the tool in Im
     
     
 Usage:
-----------
+---------- 
 
 1. Hold left click drag and release to draw the ruler in the axes.
   - Hold shift while dragging to lock the ruler to the horizontal axis.
@@ -45,7 +45,7 @@ Example
     
 
 
-![Ruler Gif](/animated_gif/mpl_ruler.gif?raw=True)
+![Ruler Gif](/animated_gif/ruler_example.gif?raw=True)
 
 
 
