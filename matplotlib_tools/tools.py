@@ -140,11 +140,11 @@ class Ruler(AxesWidget):
                     boxstyle='round',
                     edgecolor='0.75')
 
-        default_textprops = dict(xy=(.95,1),
-                                 xytext=(15, -15),
+        default_textprops = dict(xy=(0,1),
+                                 xytext=(10, -10),
                                  xycoords='axes fraction',
                                  textcoords='offset points',
-                                 ha='right',
+                                 ha='left',
                                  va='center',
                                  bbox=bbox)
 

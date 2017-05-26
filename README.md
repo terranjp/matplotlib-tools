@@ -3,45 +3,49 @@ Various tools for matplotlib.
 
 <h2>Ruler</h2>
 
-An an interactive ruler to measure distances. 
+An an interactive ruler to measure distances. Heavily inspired by the tool in ImageJ.
     
-There are two modes of operation:
+    
+Usage:
+---------- 
 
-1. Left click, drag and release to draw the ruler in the axes.
+1. Hold left click drag and release to draw the ruler in the axes.
   - Hold shift while dragging to lock the ruler to the horizontal axis.
   - Hold control while drawing to lock the ruler to the vertical axis. 
 
-2. Right click to set the start point and right click again to set the endpoint. 
+2. Right click one of the markers to move the ruler. 
 
-The keyboard can be used to activate and deactivate the ruler and toggle visibility of the line and text:
+The keyboard can be used to activate and deactivate the ruler and toggle 
+visibility of the line and text:
 
- - 'm' : Toggles the ruler on and off. Currently there is no indication on the figure that 
-    the ruler is activated. 
-     
- - 'ctl+m' : Toggles the visibility of the ruler and text. 
+'m' : Toggles the ruler on and off. 
 
+'ctl+m' : Toggles the visibility of the ruler and text. 
 
-To use the ruler pass an Axes instance as the first arg to the constructor. A example usage is shown below:
-
-
-    import numpy as np
-    import matplotlib.pyplot as plt
+Example
+----------
     
-    from matplotlib_tools.mpl_tools import Ruler
+    >>> xCoord = np.arange(0, 5, 1)
+    >>> yCoord = [0, 1, -3, 5, -3]
+    >>> fig = plt.figure()
+    >>> ax = fig.add_subplot(111)
     
-    xCoord = np.arange(0, 4*np.pi, 0.01)
-    yCoord = np.sin(xCoord)
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.grid(True)
-    ax.plot(xCoord, yCoord)
+    >>> markerprops = dict(marker='o', markersize=5, markeredgecolor='red')
+    >>> lineprops = dict(color='red', linewidth=2)
     
-    ruler = Ruler(ax=ax)
+    >>> ax.grid(True)
+    >>> ax.plot(xCoord, yCoord)
     
-    plt.show()
+    >>> ruler = Ruler(ax=ax,
+                  useblit=True,
+                  markerprops=markerprops,
+                  lineprops=lineprops)
+    
+    >>> plt.show()
+    
 
 
-![Ruler Gif](/animated_gif/mpl_ruler.gif?raw=True)
+![Ruler Gif](/animated_gif/ruler_example.gif?raw=True)
 
 
 
