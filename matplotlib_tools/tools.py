@@ -13,34 +13,36 @@ class Ruler(AxesWidget):
      Parameters
     ----------
     
-    ax  : the  :class:`matplotlib.axes.Axes` instance 
+    *ax*  : the  :class:`matplotlib.axes.Axes` instance 
        
-    active : bool, default is True
+    *active* : bool, default is True
         Whether the ruler is active or not. 
     
-    length_unit  : string, a unit identifier to use in displayed text  
+    *length_unit*  : string, a unit identifier to use in displayed text  
         i.e. ('ft', or 'm')
                         
-    angle_unit  : "degrees" or "radians"
+    *angle_unit*  : "degrees" or "radians"
         The type of angle unit ('degrees' or 'radians')
         
-    print_text  : bool, default is False
+    *print_text*  : bool, default is False
         Whether the length measure string is printed to the console
 
-    useblit : bool, default is False
+    *useblit* : bool, default is False
         If True, use the backend-dependent blitting features for faster
         canvas updates. 
 
-    lineprops : dict, default is None
+    *lineprops* : dict, default is None
       Dictionary of :class:`matplotlib.lines.Line2D` properties
                    
-    markerprops : dict, default is None
+    *markerprops* : dict, default is None
       Dictionary of :class:`matplotlib.markers.MarkerStyle` properties
       
-    textprops: dict, default is None
-        Dictionary of :class:`matplotlib.text.Text` properties
+    *textprops*: dict, default is None
+        Dictionary of :class:`matplotlib.text.Text` properties. To reposition the 
+        textbox you can overide the defaults which position the box in the top left
+        corner of the axes. 
           
-
+          
     Usage:
     ----------
 
@@ -191,6 +193,9 @@ class Ruler(AxesWidget):
                         self.marker_c]
 
     def connect_events(self):
+        """
+        Connect all events to the various callbacks
+        """
         self.connect_event('button_press_event', self.on_press)
         self.connect_event('button_release_event', self.on_release)
         self.connect_event('motion_notify_event', self.on_move)
@@ -198,6 +203,9 @@ class Ruler(AxesWidget):
         self.connect_event('key_release_event', self.on_key_release)
 
     def ignore(self, event):
+        """
+        Ignore events if the cursor is out of the axes or the widget is locked
+        """
         if not self.canvas.widgetlock.available(self):
             return True
         if event.inaxes != self.ax.axes:
@@ -206,6 +214,15 @@ class Ruler(AxesWidget):
             return True
 
     def on_key_press(self, event):
+        """
+        Handle key press events. 
+        
+        If shift is pressed the ruler will be constrained to horizontal axis
+        If control is pressed the ruler will be constrained to vertical axis
+        If m is pressed the ruler will be toggled on and off
+        If ctrl+m is pressed the visibility of the ruler will be toggled
+        """
+
         if event.key == 'shift':
             self.shift_pressed = True
 
@@ -219,6 +236,9 @@ class Ruler(AxesWidget):
             self.toggle_ruler_visibility()
 
     def on_key_release(self, event):
+        """
+        Handle key release event, flip the flags to false.
+        """
         if event.key == 'shift':
             self.shift_pressed = False
 
@@ -229,7 +249,6 @@ class Ruler(AxesWidget):
         """
         Called when the 'm' key is pressed. If ruler is on turn it off, and 
         vise versa
-        :return: 
         """
         if self.active is True:
             self.active = False
@@ -241,7 +260,6 @@ class Ruler(AxesWidget):
         """
         Called when the 'ctl+m' key is pressed. If ruler is visible turn it off
         , and vise versa
-        :return: 
         """
         if self.visible is True:
             for artist in self.artists:
@@ -268,8 +286,10 @@ class Ruler(AxesWidget):
             self.handle_button3_press(event)
 
     def handle_button1_press(self, event):
-        """On button 1 press start drawing the ruler line from the initial 
-        press position"""
+        """
+        On button 1 press start drawing the ruler line from the initial 
+        press position
+        """
 
         self.mouse1_pressed = True
 
@@ -391,6 +411,11 @@ class Ruler(AxesWidget):
         return mid_line_coords
 
     def draw_ruler(self, event):
+        """
+        If the left mouse button is pressed and held draw the ruler as the mouse
+        is dragged
+        """
+
         self.x1 = event.xdata
         self.y1 = event.ydata
 
