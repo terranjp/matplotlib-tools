@@ -148,7 +148,10 @@ class Ruler(AxesWidget):
                                  va='center',
                                  bbox=bbox)
 
-        self.ruler, = self.ax.plot([0, 0], [0, 0], label='ruler', **lineprops)
+        x0 = self.ax.get_xlim()[0]
+        y0 = self.ax.get_ylim()[0]
+
+        self.ruler, = self.ax.plot([x0, x0], [y0, y0], label='ruler', **lineprops)
 
         default_markerprops = dict(marker='s',
                                    markersize=3,
@@ -177,9 +180,9 @@ class Ruler(AxesWidget):
         self.axes_text = self.ax.annotate(s='', **used_textprops)
         self.ax.add_artist(self.axes_text)
 
-        self.marker_a, = self.ax.plot((0, 0), **used_markerprops)
-        self.marker_b, = self.ax.plot((0, 0), **used_markerprops)
-        self.marker_c, = self.ax.plot((0, 0), **used_markerprops)
+        self.marker_a, = self.ax.plot((x0, y0), **used_markerprops)
+        self.marker_b, = self.ax.plot((x0, y0), **used_markerprops)
+        self.marker_c, = self.ax.plot((x0, y0), **used_markerprops)
 
         self.artists = [self.axes_text,
                         self.ruler,
